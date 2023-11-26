@@ -67,7 +67,17 @@ void Error_Handler(void);
 #define AMS_CONT_GPIO_Port GPIOD
 
 /* USER CODE BEGIN Private defines */
+#define DEBUG_UART_HANDLE huart2
 
+#define DEBUG_ON
+#define ISO_SPI_NSS_Pin GPIO_PIN_11
+#define ISO_SPI_NSS_GPIO_Port GPIOE
+#define ISO_SPI_SCLK_Pin GPIO_PIN_12
+#define ISO_SPI_SCLK_GPIO_Port GPIOE
+#define ISO_SPI_MISO_Pin GPIO_PIN_13
+#define ISO_SPI_MISO_GPIO_Port GPIOE
+#define ISO_SPI_MOSI_Pin GPIO_PIN_14
+#define ISO_SPI_MOSI_GPIO_Port GPIOE
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

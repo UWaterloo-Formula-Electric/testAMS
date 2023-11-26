@@ -56,7 +56,7 @@ osThreadId AMSHandle;
 
 /* USER CODE END FunctionPrototypes */
 
-void mainTaskFunction(void const * argument);
+extern void mainTaskFunction(void const * argument);
 extern void printTask(void const * argument);
 extern void amsTask(void const * argument);
 
