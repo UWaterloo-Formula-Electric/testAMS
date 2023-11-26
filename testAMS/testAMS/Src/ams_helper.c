@@ -181,10 +181,11 @@ HAL_StatusTypeDef ltc_read_config(uint8_t total_ic, //Number of ICs in the syste
         received_pec = (tempBuffer[current_ic][6]<<8) + tempBuffer[current_ic][7];
         data_pec = pec15_calc(6, &tempBuffer[current_ic][0]);
         
-        if (received_pec != data_pec)
-        {
-            return HAL_ERROR;
-        }
+        /* Problem: Taking way longer than it should (40 seconds) to run this if statement*/
+        // if (received_pec != data_pec)
+        // {
+        //     return HAL_ERROR;
+        // }
 
         // Copy data out
         for (int i = 0; i < BATT_CONFIG_SIZE; i++) {

@@ -6,7 +6,7 @@
 
 #include "main.h"
 
-#define AMS_TASK_PERIOD_MS 100
+#define AMS_TASK_PERIOD_MS 300 // should be 100 ms
 #define T_REFUP_MS           6 // Takes 5.5 ms for reference to power up
 
 #define ADC_OPT(en) ((en) << 0) // Since we're using the normal 7kHz mode

@@ -1,5 +1,6 @@
 #ifndef __DEBUG_H
 #define __DEBUG_H
+#include "bsp.h"
 #include "usart.h"
 #include "FreeRTOS.h"
 #include "queue.h"
@@ -31,7 +32,10 @@
  * Send Function and Defines
  */
 #define UART_PRINT_TIMEOUT 100
+
+// We have more space on F7, so make this longer
 #define PRINT_QUEUE_LENGTH 15
+
 
 #define PRINT_QUEUE_STRING_SIZE 100
 #define PRINT_QUEUE_SEND_TIMEOUT_TICKS  10

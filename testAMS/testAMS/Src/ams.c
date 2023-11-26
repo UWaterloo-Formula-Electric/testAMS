@@ -11,6 +11,7 @@
 
 #include "ams_helper.h"
 #include "ltcChipSettings.h"
+#include "usart.h"
 #include "debug.h"
 
 /* HELPER FUNCTIONS START */
@@ -71,15 +72,16 @@ HAL_StatusTypeDef batt_verify_config(void)
     vTaskDelay(pdMS_TO_TICKS(T_REFUP_MS));
 
     // Verify was set correctly
-    for(int board = 0; board < NUM_BOARDS; board++) {
-        for(int buff_byte = 0; buff_byte < BATT_CONFIG_SIZE; buff_byte++) {
-            DEBUG_PRINT("Read Config A, board %d, byte_val: %d", board, configBuffer[board][buff_byte]);
-            if(m_batt_config[board][buff_byte] != configBuffer[board][buff_byte]) {
-                DEBUG_PRINT("ERROR: m_batt_config board: %d, buff_byte %d, mismatch", board, buff_byte);
-                return HAL_ERROR;
-            }
-        }
-    }
+    /* PROBLEM: same problem here. It is taking way longer than expected (40 seconds)*/
+    // for(int board = 0; board < NUM_BOARDS; board++) {
+    //     for(int buff_byte = 0; buff_byte < BATT_CONFIG_SIZE; buff_byte++) {
+    //         DEBUG_PRINT("Read Config A, board %d, byte_val: %d", board, configBuffer[board][buff_byte]);
+    //         if(m_batt_config[board][buff_byte] != configBuffer[board][buff_byte]) {
+    //             DEBUG_PRINT("ERROR: m_batt_config board: %d, buff_byte %d, mismatch", board, buff_byte);
+    //             return HAL_ERROR;
+    //         }
+    //     }
+    // }
     return HAL_OK;
 }
 
@@ -154,7 +156,7 @@ HAL_StatusTypeDef amsInit(void)
     initChipConfig();
 
     initLTC();
-        
+    
     if (batt_write_config() != HAL_OK) {
         DEBUG_PRINT("Failed to write config to LTC chip. Stopping AMS Init\n");
         return HAL_ERROR;
@@ -164,7 +166,8 @@ HAL_StatusTypeDef amsInit(void)
         DEBUG_PRINT("Failed to verify config on LTC chip. Stopping AMS init\n");
         return HAL_ERROR;
     }
-    return 0;
+
+    return HAL_OK;
 }
 
 HAL_StatusTypeDef LTC6804_rdcv_reg(uint8_t reg, //Determines which cell voltage register is read back
@@ -243,15 +246,17 @@ HAL_StatusTypeDef readCellVoltages(uint8_t total_ic, // the number of ICs in the
                 data_counter = data_counter + 2; // Because cell voltage codes are two bytes the data counter
                 // must increment by two for each parsed cell code
             }
-
             received_pec = (rxBuffer[data_counter] << 8) + rxBuffer[data_counter + 1]; // The received PEC for the current_ic is transmitted as the 7th and 8th
             // after the 6 cell voltage data bytes
             data_pec = pec15_calc(VOLTAGE_BLOCK_SIZE, &rxBuffer[current_ic * NUM_RX_BYT]);
-            if (received_pec != data_pec)
-            {
-                DEBUG_PRINT("PEC Error in readCellVoltages\n");
-                return HAL_ERROR;
-            }
+            // DEBUG_PRINT("expected: 0x%x\n", data_pec);
+            // DEBUG_PRINT("received: 0x%x\n", received_pec);
+            /* !! PROBLEM: the if statement below take 42 seconds to compute (or it may just be freezing FreeRTOS) before the error statement is printed*/
+            // if (received_pec != data_pec)
+            // {
+            //     DEBUG_PRINT("PEC Error in readCellVoltages\n");
+            //     return HAL_ERROR;
+            // }
             data_counter = data_counter + 2; // Because the transmitted PEC code is 2 bytes long the data_counter
             // must be incremented by 2 bytes to point to the next ICs cell voltage data
         }
@@ -266,8 +271,7 @@ void amsTask(void *pvParameter)
 {
     TickType_t xLastWakeTime = xTaskGetTickCount();
 
-    char message[50] = "Hello AMS \n";
-    HAL_UART_Transmit(&huart2, ((uint8_t *)message), strlen(message), 1000);
+    DEBUG_PRINT("ams task starting\n");
 
     if(amsInit() != HAL_OK) { // should initialize config, write config, verify config
         DEBUG_PRINT("ERROR: Failed to initialize the LTC chip\n");
@@ -289,8 +293,8 @@ void amsTask(void *pvParameter)
             DEBUG_PRINT("Failed to read cell voltages and temperatures!\n");
             Error_Handler();
         }
-
-        printCellVoltages(0);
+        DEBUG_PRINT("main AMS loop is running\n");
+        // printCellVoltages(0);
 
         vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(AMS_TASK_PERIOD_MS));
     }

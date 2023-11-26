@@ -1,5 +1,5 @@
 #include "debug.h"
-#include "main.h"
+#include "bsp.h"
 #include "stdio.h"
 #include "string.h"
 #include "task.h"
@@ -39,10 +39,6 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
     }
 }
 
-#define INPUT_BUFFER_SIZE (100)
-#define OUTPUT_BUFFER_SIZE (configCOMMAND_INT_MAX_OUTPUT_SIZE)
-static char rxString[INPUT_BUFFER_SIZE];
-static int rxIndex = 0;
 
 HAL_StatusTypeDef debugInit()
 {

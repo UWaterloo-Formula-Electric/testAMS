@@ -21,13 +21,12 @@
 #include "cmsis_os.h"
 #include "spi.h"
 #include "tim.h"
-#include "usart.h"
 #include "gpio.h"
-#include "string.h"
-#include "debug.h"
+#include "usart.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "debug.h"
+#include "generalErrorHandler.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -55,17 +54,7 @@
 void SystemClock_Config(void);
 void MX_FREERTOS_Init(void);
 /* USER CODE BEGIN PFP */
-#ifdef __GNUC__
-#define PUTCHAR_PROTOTYPE int __io_putchar(int ch)
-#else
-#define PUTCHAR_PROTOTYPE int fputc(int ch, FILE *f)
-#endif
-
-PUTCHAR_PROTOTYPE
-{
-  HAL_UART_Transmit(&huart2, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
-  return ch;
-}
+__weak void userInit() {}
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -105,7 +94,7 @@ int main(void)
   MX_USART2_UART_Init();
   MX_TIM9_Init();
   /* USER CODE BEGIN 2 */
-
+  userInit();
   /* USER CODE END 2 */
 
   /* Call init function for freertos objects (in freertos.c) */
@@ -187,6 +176,8 @@ void Error_Handler(void)
   __disable_irq();
   while (1)
   {
+    DEBUG_PRINT("ERROR OCCURRED. NOW IN ERROR HANDLER\n");
+    HAL_Delay(3000);
   }
   /* USER CODE END Error_Handler_Debug */
 }

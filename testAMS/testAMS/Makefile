@@ -44,6 +44,7 @@ Src/gpio.c \
 Src/freertos.c \
 Src/generalErrorHandler.c \
 Src/debug.c \
+Src/userInit.c \
 Src/spi.c \
 Src/usart.c \
 Src/stm32f7xx_it.c \
