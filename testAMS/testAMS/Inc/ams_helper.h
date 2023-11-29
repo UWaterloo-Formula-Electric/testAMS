@@ -73,8 +73,6 @@ static const unsigned int crc15Table[256] = {0x0,0xc599, 0xceab, 0xb32, 0xd8cf, 
 
 // function declarations
 void delay_us(uint32_t time_us);
-HAL_StatusTypeDef ltc_write_config(uint8_t config[NUM_BOARDS][BATT_CONFIG_SIZE]);
-HAL_StatusTypeDef ltc_read_config(uint8_t total_ic, uint8_t r_config[][6]);
 void wakeup_idle();
 void wakeup_sleep();
 HAL_StatusTypeDef spi_tx(uint8_t *txBuffer, uint32_t length);

@@ -5,6 +5,7 @@
 #include <stdbool.h>
 
 #include "main.h"
+#include "ltcChipSettings.h"
 
 #define AMS_TASK_PERIOD_MS 300 // should be 100 ms
 #define T_REFUP_MS           6 // Takes 5.5 ms for reference to power up
@@ -123,6 +124,8 @@ HAL_StatusTypeDef readCellVoltages(uint8_t total_ic, float cell_codes[][12]);
 // void LTC6804_rdaux_reg(uint8_t reg, uint8_t nIC,uint8_t *data);
 
 HAL_StatusTypeDef batt_verify_config(void);
+HAL_StatusTypeDef ltc_write_config(uint8_t config[NUM_BOARDS][BATT_CONFIG_SIZE]);
+HAL_StatusTypeDef ltc_read_config(uint8_t total_ic, uint8_t r_config[][6]);
 
 void printCellVoltages(uint8_t board);
 
