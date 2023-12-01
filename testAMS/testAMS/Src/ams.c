@@ -5,7 +5,6 @@
 #include "ams.h"
 
 #include <stdio.h>
-#include <stdbool.h>
 #include "FreeRTOS.h"
 #include "task.h"
 
@@ -55,7 +54,7 @@ void initChipConfig(void)
 
 	for(int board = 0; board < NUM_BOARDS; board++) {
         m_batt_config[board][0] = REFON(1) | ADC_OPT(0) | SWTRD(1); // we only care about the first register in the group
-        DEBUG_PRINT("m_batt_config[%i]: %x\n", board, m_batt_config[board][0]);// THIS IS CORRECT
+        // DEBUG_PRINT("m_batt_config[%i]: %x\n", board, m_batt_config[board][0]);// THIS IS CORRECT
 	}
 }
 
@@ -63,7 +62,8 @@ HAL_StatusTypeDef batt_write_config(void)
 {
     for (int i = 0; i < NUM_BOARDS; i++){
         if (ltc_write_config(m_batt_config) != HAL_OK){
-            DEBUG_PRINT("Failed to write config to LTC chip\n");
+            // DEBUG_PRINT("Failed to write config to LTC chip\n");
+            GPIO_TOGGLE_ERROR_LED;
             return HAL_ERROR;
         }
     }
@@ -75,22 +75,23 @@ HAL_StatusTypeDef batt_verify_config(void)
 {
     uint8_t configBuffer[NUM_BOARDS][BATT_CONFIG_SIZE] = {0};
     if (ltc_read_config(NUM_BOARDS, configBuffer) != HAL_OK){
-        DEBUG_PRINT("Failed to read config from LTC\n");
+        // DEBUG_PRINT("Failed to read config from LTC\n");
+        GPIO_TOGGLE_ERROR_LED;
         return HAL_ERROR;
     }
 
     vTaskDelay(pdMS_TO_TICKS(T_REFUP_MS));
 
-    // Verify was set correctly
     /* PROBLEM: same problem here. It is taking way longer than expected (40 seconds)*/
     for(int board = 0; board < NUM_BOARDS; board++) {
         for(int buff_byte = 0; buff_byte < BATT_CONFIG_SIZE; buff_byte++) {
-            DEBUG_PRINT("Read Config A, board %d, byte_val: %d, expected: %d\n", board, configBuffer[board][buff_byte], m_batt_config[board][buff_byte]);
-            // if(m_batt_config[board][buff_byte] != configBuffer[board][buff_byte]) {
+            // DEBUG_PRINT("Read Config A, board %d, byte_val: %d, expected: %d\n", board, configBuffer[board][buff_byte], m_batt_config[board][buff_byte]);
+            if(m_batt_config[board][buff_byte] != configBuffer[board][buff_byte]) {
             //     DEBUG_PRINT("ERROR: m_batt_config board: %d, buff_byte %d, mismatch", board, buff_byte);
             //     DEBUG_PRINT("FAILD CONFIG\n");
-            //     return HAL_ERROR;
-            // }
+                GPIO_TOGGLE_ERROR_LED;
+                return HAL_ERROR;
+            }
         }
     }
     return HAL_OK;
@@ -121,7 +122,7 @@ Command Code:
 ********************************************************/
 HAL_StatusTypeDef ltc_write_config(uint8_t config[NUM_BOARDS][BATT_CONFIG_SIZE] // configuration data that will be written
                                   )
-{
+{                               // 2             2             6                2               1
     const uint64_t BUFF_SIZE = COMMAND_SIZE + PEC_SIZE + ((BATT_CONFIG_SIZE + PEC_SIZE) * NUM_BOARDS);
     uint16_t cfg_pec;
     uint8_t data_index; //command counter
@@ -138,13 +139,13 @@ HAL_StatusTypeDef ltc_write_config(uint8_t config[NUM_BOARDS][BATT_CONFIG_SIZE] 
         for (uint8_t current_byte = 0; current_byte < BATT_CONFIG_SIZE; current_byte++) // executes for each of the 6 bytes in the CFGR register
         {
             // current_byte is the byte counter
-            txBuffer[data_index] = config[current_ic][current_byte];
-            DEBUG_PRINT("config to be written[ic = %i][byte = %i]: %x\n", current_ic, current_byte, config[current_ic][current_byte]);
-            DEBUG_PRINT("txBuffer[%i]: %x\n", data_index, txBuffer[data_index]);
+            txBuffer[data_index] = config[current_ic-1][current_byte];
+            // DEBUG_PRINT("config to be written[ic = %i][byte = %i]: %x\n", current_ic, current_byte, config[current_ic][current_byte]);
+            // DEBUG_PRINT("txBuffer[%i]: %x\n", data_index, txBuffer[data_index]);
             data_index++;
         }
 
-        // calculating PEC
+        // calculating PEC (double check this)
         cfg_pec = (uint16_t)pec15_calc(BATT_CONFIG_SIZE, &config[current_ic - 1][0]); // calculating the PEC for each ICs configuration register data
         txBuffer[data_index] = (uint8_t)(cfg_pec >> 8);
         txBuffer[data_index + 1] = (uint8_t)cfg_pec;
@@ -152,12 +153,13 @@ HAL_StatusTypeDef ltc_write_config(uint8_t config[NUM_BOARDS][BATT_CONFIG_SIZE] 
     }
 
     wakeup_idle(); //This will guarantee that the LTC6804 isoSPI port is awake.This command can be removed.
-    for (int i = 0; i < BUFF_SIZE; i++) {
-        DEBUG_PRINT("0x%x ", txBuffer[i]);
-    }
+    // for (int i = 0; i < BUFF_SIZE; i++) {
+    //     DEBUG_PRINT("0x%x ", txBuffer[i]);
+    // }
     // sending the right command + PEC
     if (spi_tx(txBuffer, BUFF_SIZE) != HAL_OK){
-        DEBUG_PRINT("Failed to transmit data to chip\n");
+        // DEBUG_PRINT("Failed to transmit data to chip\n");
+        GPIO_TOGGLE_ERROR_LED;
         return HAL_ERROR;
     }
 
@@ -184,14 +186,14 @@ HAL_StatusTypeDef ltc_read_config(uint8_t total_ic, //Number of ICs in the syste
         DEBUG_PRINT("Failed to write and read from chip\n");
         return HAL_ERROR; // error
     }
-
+    //                                              1 
     for (uint8_t current_ic = 0; current_ic < total_ic; current_ic++){       //executes for each LTC6804 in the daisy chain and packs the data
         //into the r_config array as well as check the received Config data
         //for any bit errors
-
+                                                            // 8
         for (uint8_t current_byte = 0; current_byte < BYTES_IN_REG_AND_PEC; current_byte++)
         {
-            tempBuffer[current_ic][current_byte] = rxBuffer[current_byte + (current_ic*BYTES_IN_REG_AND_PEC)];
+            tempBuffer[current_ic][current_byte] = rxBuffer[START_OF_DATA_IDX + current_byte + (current_ic*BYTES_IN_REG_AND_PEC)];
         }
 
         // check PEC
@@ -199,14 +201,15 @@ HAL_StatusTypeDef ltc_read_config(uint8_t total_ic, //Number of ICs in the syste
         data_pec = pec15_calc(6, &tempBuffer[current_ic][0]);
         
         /* Problem: Taking way longer than it should (40 seconds) to run this if statement*/
-        // if (received_pec != data_pec)
-        // {
-        //     return HAL_ERROR;
-        // }
+        if (received_pec != data_pec)
+        {
+            DEBUG_PRINT("PEC ERROR in read config");
+            return HAL_ERROR;
+        }
 
         // Copy data out
         for (int i = 0; i < BATT_CONFIG_SIZE; i++) {
-            r_config[current_ic][i] = rxBuffer[START_OF_DATA_IDX + i];
+            r_config[current_ic][i] = rxBuffer[START_OF_DATA_IDX + i + (current_ic*BYTES_IN_REG_AND_PEC)];
         }
     }
 
@@ -303,8 +306,8 @@ HAL_StatusTypeDef LTC6804_rdcv_reg(uint8_t reg, //Determines which cell voltage 
                                    uint8_t *data //An array of the unparsed cell codes
                                    )
 {
-    const uint8_t DATA_LENGTH = VOLTAGE_BLOCK_SIZE + PEC_SIZE;
-    uint8_t txBuffer[COMMAND_SIZE + PEC_SIZE];
+    const uint8_t DATA_LENGTH = COMMAND_SIZE + PEC_SIZE + ((VOLTAGE_BLOCK_SIZE + PEC_SIZE) * total_ic);
+    uint8_t txBuffer[DATA_LENGTH];
     uint8_t cmdByteLow, cmdByteHigh;
 
     if (reg == 1)     //1: RDCVA
@@ -335,7 +338,7 @@ HAL_StatusTypeDef LTC6804_rdcv_reg(uint8_t reg, //Determines which cell voltage 
 
     wakeup_idle();
 
-    spi_write_read(txBuffer, data, (DATA_LENGTH * total_ic));
+    spi_write_read(txBuffer, data, DATA_LENGTH);
 
     return HAL_OK;
 }
@@ -345,7 +348,7 @@ HAL_StatusTypeDef readCellVoltages(uint8_t total_ic, // the number of ICs in the
                                    )
 {
     const uint8_t NUM_RX_BYT = 8;
-    uint8_t RX_BUFFER_SIZE = ((VOLTAGE_BLOCK_SIZE + PEC_SIZE) * NUM_BOARDS);
+    uint8_t RX_BUFFER_SIZE = (COMMAND_SIZE + PEC_SIZE + (VOLTAGE_BLOCK_SIZE + PEC_SIZE) * NUM_BOARDS);
     uint8_t rxBuffer[RX_BUFFER_SIZE];
     uint16_t adc_val = 0;
     uint16_t received_pec = 0;
@@ -355,7 +358,7 @@ HAL_StatusTypeDef readCellVoltages(uint8_t total_ic, // the number of ICs in the
 
     for (uint8_t cell_reg = 1; cell_reg < 5; cell_reg++) //executes once for each of the LTC6804 cell voltage groups
     {
-        data_counter = 0;
+        data_counter = START_OF_DATA_IDX;
         LTC6804_rdcv_reg(cell_reg, total_ic, rxBuffer); //Reads a single Cell voltage group
 
         for (uint8_t current_ic = 0 ; current_ic < total_ic; current_ic++) // executes for every LTC6804 in the daisy chain
@@ -376,15 +379,15 @@ HAL_StatusTypeDef readCellVoltages(uint8_t total_ic, // the number of ICs in the
             }
             received_pec = (rxBuffer[data_counter] << 8) + rxBuffer[data_counter + 1]; // The received PEC for the current_ic is transmitted as the 7th and 8th
             // after the 6 cell voltage data bytes
-            data_pec = pec15_calc(VOLTAGE_BLOCK_SIZE, &rxBuffer[current_ic * NUM_RX_BYT]);
+            data_pec = pec15_calc(VOLTAGE_BLOCK_SIZE, &rxBuffer[START_OF_DATA_IDX + ((VOLTAGE_BLOCK_SIZE + PEC_SIZE) * current_ic)]);
             // DEBUG_PRINT("expected: 0x%x\n", data_pec);
             // DEBUG_PRINT("received: 0x%x\n", received_pec);
             /* !! PROBLEM: the if statement below take 42 seconds to compute (or it may just be freezing FreeRTOS) before the error statement is printed*/
-            // if (received_pec != data_pec)
-            // {
-            //     DEBUG_PRINT("PEC Error in readCellVoltages\n");
-            //     return HAL_ERROR;
-            // }
+            if (received_pec != data_pec)
+            {
+                DEBUG_PRINT("PEC Error in readCellVoltages\n");
+                return HAL_ERROR;
+            }
             data_counter = data_counter + 2; // Because the transmitted PEC code is 2 bytes long the data_counter
             // must be incremented by 2 bytes to point to the next ICs cell voltage data
         }
@@ -399,7 +402,7 @@ void amsTask(void *pvParameter)
 {
     TickType_t xLastWakeTime = xTaskGetTickCount();
 
-    DEBUG_PRINT("ams task starting\n");
+    // DEBUG_PRINT("ams task starting\n");
 
     if(amsInit() != HAL_OK) { // should initialize config, write config, verify config
         DEBUG_PRINT("ERROR: Failed to initialize the LTC chip\n");
@@ -415,13 +418,13 @@ void amsTask(void *pvParameter)
         }
 
         vTaskDelay(pdMS_TO_TICKS(2)); // testing, 30 ms is good. 10 ms seems to be the lowest we can go
-        delay_us(400); // specs say 2.4 MS
+        delay_us(300); // specs say 2.3 MS
 
         if (readCellVoltages(NUM_BOARDS, cell_voltages) != HAL_OK) {
             DEBUG_PRINT("Failed to read cell voltages and temperatures!\n");
             Error_Handler();
         }
-        // DEBUG_PRINT("main AMS loop is running\n");
+        DEBUG_PRINT("main AMS loop is running\n");
         // printCellVoltages(0);
 
         vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(AMS_TASK_PERIOD_MS));

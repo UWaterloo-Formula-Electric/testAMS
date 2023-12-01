@@ -60,7 +60,9 @@
         } \
         char buf[PRINT_QUEUE_STRING_SIZE] = {0}; \
         snprintf(buf, PRINT_QUEUE_STRING_SIZE, __VA_ARGS__); \
-        xQueueSend(printQueue, buf, PRINT_QUEUE_SEND_TIMEOUT_TICKS); \
+        xQueueSend(printQueue, buf, 0); \
+        //xQueueSend(printQueue, buf, PRINT_QUEUE_SEND_TIMEOUT_TICKS); \
+
     } while(0)
 
 /**

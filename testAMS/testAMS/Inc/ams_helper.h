@@ -2,7 +2,6 @@
 #define AMS_HELPER_H
 
 #include <stdint.h>
-#include <stdbool.h>
 
 #include "ams.h"
 #include "ltcChipSettings.h"
@@ -10,11 +9,9 @@
 #include "tim.h"
 #include "main.h"
 
-#define ISO_SPI_HANDLE hspi4
-#define DELAY_TIMER htim9
-#define DELAY_TIMER_INSTANCE TIM9
 #define HSPI_TIMEOUT 15
 
+#define GPIO_TOGGLE_ERROR_LED HAL_GPIO_TogglePin(LED_R_GPIO_Port, LED_R_Pin);
 /*
   Pre computed crc15 table used for the LTC6804 PEC calculation
 

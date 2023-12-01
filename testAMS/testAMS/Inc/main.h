@@ -70,6 +70,11 @@ void Error_Handler(void);
 #define DEBUG_UART_HANDLE huart2
 
 #define DEBUG_ON
+
+#define DELAY_TIMER htim9
+#define DELAY_TIMER_INSTANCE TIM9
+
+#define ISO_SPI_HANDLE hspi4
 #define ISO_SPI_NSS_Pin GPIO_PIN_11
 #define ISO_SPI_NSS_GPIO_Port GPIOE
 #define ISO_SPI_SCLK_Pin GPIO_PIN_12
