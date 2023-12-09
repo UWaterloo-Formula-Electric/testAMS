@@ -5,6 +5,7 @@
 #include "ams.h"
 
 #include <stdio.h>
+#include <string.h>
 #include "FreeRTOS.h"
 #include "task.h"
 
@@ -45,6 +46,8 @@ static uint8_t ADAX[2]; //!< GPIO conversion command.
 static uint8_t m_batt_config[NUM_BOARDS][BATT_CONFIG_SIZE] = {0};
 float cell_voltages[NUM_BOARDS][12];
 
+static uint32_t lastWakeup_ticks = 0;
+
 void initChipConfig(void)
 {
     // memset(cell_voltage_failure, 0, NUM_BOARDS*NUM_LTC_CHIPS_PER_BOARD*VOLTAGE_BLOCKS_PER_CHIP);
@@ -54,7 +57,7 @@ void initChipConfig(void)
 
 	for(int board = 0; board < NUM_BOARDS; board++) {
         m_batt_config[board][0] = REFON(1) | ADC_OPT(0) | SWTRD(1); // we only care about the first register in the group
-        // DEBUG_PRINT("m_batt_config[%i]: %x\n", board, m_batt_config[board][0]);// THIS IS CORRECT
+        // printf("m_batt_config[%i]: %x\n", board, m_batt_config[board][0]);// THIS IS CORRECT
 	}
 }
 
@@ -63,7 +66,7 @@ HAL_StatusTypeDef batt_write_config(void)
     for (int i = 0; i < NUM_BOARDS; i++){
         if (ltc_write_config(m_batt_config) != HAL_OK){
             // DEBUG_PRINT("Failed to write config to LTC chip\n");
-            GPIO_TOGGLE_ERROR_LED;
+            // GPIO_TOGGLE_ERROR_LED;
             return HAL_ERROR;
         }
     }
@@ -75,7 +78,7 @@ HAL_StatusTypeDef batt_verify_config(void)
 {
     uint8_t configBuffer[NUM_BOARDS][BATT_CONFIG_SIZE] = {0};
     if (ltc_read_config(NUM_BOARDS, configBuffer) != HAL_OK){
-        // DEBUG_PRINT("Failed to read config from LTC\n");
+        // DEBUG_PRINT("Failed to read config from LTC\n"); // causing the freeze is debug_print
         GPIO_TOGGLE_ERROR_LED;
         return HAL_ERROR;
     }
@@ -85,15 +88,16 @@ HAL_StatusTypeDef batt_verify_config(void)
     /* PROBLEM: same problem here. It is taking way longer than expected (40 seconds)*/
     for(int board = 0; board < NUM_BOARDS; board++) {
         for(int buff_byte = 0; buff_byte < BATT_CONFIG_SIZE; buff_byte++) {
-            // DEBUG_PRINT("Read Config A, board %d, byte_val: %d, expected: %d\n", board, configBuffer[board][buff_byte], m_batt_config[board][buff_byte]);
+            printf("Read Config A, board %d, byte_val: %d, expected: %d\n", board, configBuffer[board][buff_byte], m_batt_config[board][buff_byte]);
             if(m_batt_config[board][buff_byte] != configBuffer[board][buff_byte]) {
             //     DEBUG_PRINT("ERROR: m_batt_config board: %d, buff_byte %d, mismatch", board, buff_byte);
-            //     DEBUG_PRINT("FAILD CONFIG\n");
-                GPIO_TOGGLE_ERROR_LED;
+                // DEBUG_PRINT("FAILD CONFIG MATCH\n");
+                // GPIO_TOGGLE_ERROR_LED;
                 return HAL_ERROR;
             }
         }
     }
+    printf("CONFIG GOOD\n");
     return HAL_OK;
 }
 
@@ -153,13 +157,10 @@ HAL_StatusTypeDef ltc_write_config(uint8_t config[NUM_BOARDS][BATT_CONFIG_SIZE] 
     }
 
     wakeup_idle(); //This will guarantee that the LTC6804 isoSPI port is awake.This command can be removed.
-    // for (int i = 0; i < BUFF_SIZE; i++) {
-    //     DEBUG_PRINT("0x%x ", txBuffer[i]);
-    // }
-    // sending the right command + PEC
+
     if (spi_tx(txBuffer, BUFF_SIZE) != HAL_OK){
         // DEBUG_PRINT("Failed to transmit data to chip\n");
-        GPIO_TOGGLE_ERROR_LED;
+        // GPIO_TOGGLE_ERROR_LED;
         return HAL_ERROR;
     }
 
@@ -178,19 +179,22 @@ HAL_StatusTypeDef ltc_read_config(uint8_t total_ic, //Number of ICs in the syste
     uint8_t rxBuffer[BUFF_SIZE];
     uint8_t tempBuffer[NUM_BOARDS][8];
 
-    format_ltc_command(RDCFG_BYTE0, RDCFG_BYTE1, txBuffer);
+    memset(txBuffer, 0, BUFF_SIZE);
+    memset(rxBuffer, 0, BUFF_SIZE);
 
+    format_ltc_command(RDCFG_BYTE0, RDCFG_BYTE1, txBuffer);
+   
     wakeup_idle();
 
     if (spi_write_read(txBuffer, rxBuffer, BUFF_SIZE) != HAL_OK){
-        DEBUG_PRINT("Failed to write and read from chip\n");
-        return HAL_ERROR; // error
+        // DEBUG_PRINT("Failed to write and read from chip\n");
+        // GPIO_TOGGLE_Y_LED;
+        return HAL_ERROR;
     }
-    //                                              1 
+    
     for (uint8_t current_ic = 0; current_ic < total_ic; current_ic++){       //executes for each LTC6804 in the daisy chain and packs the data
         //into the r_config array as well as check the received Config data
         //for any bit errors
-                                                            // 8
         for (uint8_t current_byte = 0; current_byte < BYTES_IN_REG_AND_PEC; current_byte++)
         {
             tempBuffer[current_ic][current_byte] = rxBuffer[START_OF_DATA_IDX + current_byte + (current_ic*BYTES_IN_REG_AND_PEC)];
@@ -198,12 +202,15 @@ HAL_StatusTypeDef ltc_read_config(uint8_t total_ic, //Number of ICs in the syste
 
         // check PEC
         received_pec = (tempBuffer[current_ic][6]<<8) + tempBuffer[current_ic][7];
-        data_pec = pec15_calc(6, &tempBuffer[current_ic][0]);
+        data_pec = pec15_calc(6, &tempBuffer[current_ic][0]); // PEC calculation is correct
         
         /* Problem: Taking way longer than it should (40 seconds) to run this if statement*/
+        // this is failing 
         if (received_pec != data_pec)
         {
-            DEBUG_PRINT("PEC ERROR in read config");
+            // printf("error occurred\n");
+            GPIO_TOGGLE_Y_LED;
+            // DEBUG_PRINT("PEC ERROR in read config");
             return HAL_ERROR;
         }
 
@@ -218,8 +225,8 @@ HAL_StatusTypeDef ltc_read_config(uint8_t total_ic, //Number of ICs in the syste
 
 void initLTC(void)
 {
-    wakeup_sleep(); // wake up the LTC from sleep
     set_adc(MD_NORMAL, DCP_DISABLED, CELL_CH_ALL, AUX_CH_ALL); // initialize adcv and adax commands (doesn't write)
+    wakeup_sleep(); // wake up the LTC from sleep
 }
 
 HAL_StatusTypeDef LTC6804_adcv(void)
@@ -238,7 +245,7 @@ HAL_StatusTypeDef LTC6804_adcv(void)
     wakeup_idle();
 
     if (spi_tx(txBuffer, BUFF_SIZE) != HAL_OK){
-        DEBUG_PRINT("Failed to transmit data to LTC in ADCV\n");
+        // DEBUG_PRINT("Failed to transmit data to LTC in ADCV\n");
         return HAL_ERROR;
     }
 
@@ -284,18 +291,20 @@ void set_adc(uint8_t MD, //ADC Mode
 
 HAL_StatusTypeDef amsInit(void)
 {
+    AMS_CONT_CLOSE;
+
     initChipConfig();
 
     initLTC();
     
     if (batt_write_config() != HAL_OK) {
-        DEBUG_PRINT("Failed to write config to LTC chip. Stopping AMS Init\n");
+        // DEBUG_PRINT("Failed to write config to LTC chip. Stopping AMS Init\n");
         return HAL_ERROR;
     }
 
     if (batt_verify_config() != HAL_OK) {
-        DEBUG_PRINT("Failed to verify config on LTC chip. Stopping AMS init\n");
         return HAL_ERROR;
+        // DEBUG_PRINT("Failed to verify config on LTC chip. Stopping AMS init\n");
     }
 
     return HAL_OK;
@@ -330,7 +339,7 @@ HAL_StatusTypeDef LTC6804_rdcv_reg(uint8_t reg, //Determines which cell voltage 
         cmdByteHigh = 0x0A;
         cmdByteLow = 0x00;
     } else {
-		DEBUG_PRINT("Attempt to access unkown voltage block\n");
+		// DEBUG_PRINT("Attempt to access unkown voltage block\n");
 		return HAL_ERROR;
 	}
     
@@ -385,7 +394,7 @@ HAL_StatusTypeDef readCellVoltages(uint8_t total_ic, // the number of ICs in the
             /* !! PROBLEM: the if statement below take 42 seconds to compute (or it may just be freezing FreeRTOS) before the error statement is printed*/
             if (received_pec != data_pec)
             {
-                DEBUG_PRINT("PEC Error in readCellVoltages\n");
+                // DEBUG_PRINT("PEC Error in readCellVoltages\n");
                 return HAL_ERROR;
             }
             data_counter = data_counter + 2; // Because the transmitted PEC code is 2 bytes long the data_counter
@@ -403,28 +412,35 @@ void amsTask(void *pvParameter)
     TickType_t xLastWakeTime = xTaskGetTickCount();
 
     // DEBUG_PRINT("ams task starting\n");
-
-    if(amsInit() != HAL_OK) { // should initialize config, write config, verify config
-        DEBUG_PRINT("ERROR: Failed to initialize the LTC chip\n");
+    HAL_StatusTypeDef ret = HAL_ERROR;
+    for (int num_tries = 0; num_tries < START_NUM_TRIES; num_tries++) {
+        ret = amsInit();
+        if(ret == HAL_OK) {
+            break;
+        }
+        // vTaskDelay(pdMS_TO_TICKS(7)); // this is needed if wakeup_idle is removed from all config functions
+    }
+    if (ret != HAL_OK) {
         Error_Handler();
     }
 
-    DEBUG_PRINT("Done initialization. Running AMS Task now\n");
-
     while (1) {
         if (LTC6804_adcv() != HAL_OK){
-            DEBUG_PRINT("Failed to send ADCV command in amsTask\n");
+            printf("failed to start ADC (adcv)\n");
+            // DEBUG_PRINT("Failed to send ADCV command in amsTask\n");
             Error_Handler();
         }
 
-        vTaskDelay(pdMS_TO_TICKS(2)); // testing, 30 ms is good. 10 ms seems to be the lowest we can go
-        delay_us(300); // specs say 2.3 MS
+        // vTaskDelay(pdMS_TO_TICKS(2)); // testing, 30 ms is good. 10 ms seems to be the lowest we can go
+        // ^ vTaskDelay might be causing issues due to inaccuracies 
+        // delay_us(300); // specs say 2.3 MS
 
         if (readCellVoltages(NUM_BOARDS, cell_voltages) != HAL_OK) {
-            DEBUG_PRINT("Failed to read cell voltages and temperatures!\n");
+            // DEBUG_PRINT("Failed to read cell voltages and temperatures!\n");
+            printf("failed to read cell voltages RDCV\n");
             Error_Handler();
         }
-        DEBUG_PRINT("main AMS loop is running\n");
+        // printf("main AMS loop is running\n");
         // printCellVoltages(0);
 
         vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(AMS_TASK_PERIOD_MS));
@@ -434,6 +450,6 @@ void amsTask(void *pvParameter)
 void printCellVoltages(uint8_t board)
 {
     for (int i = 0; i < CELLS_PER_BOARD; i++) {
-        DEBUG_PRINT("Cell Voltage[%i]: %f\n", i, cell_voltages[board][i]);
+        printf("Cell Voltage[%i]: %f\n", i, cell_voltages[board][i]);
     }
 }

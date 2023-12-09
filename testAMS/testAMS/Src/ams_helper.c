@@ -22,7 +22,7 @@ void delay_us(uint32_t time_us)
 
 void wakeup_idle(){
     HAL_GPIO_WritePin(ISO_SPI_NSS_GPIO_Port, ISO_SPI_NSS_Pin, GPIO_PIN_RESET);
-    delay_us(2);
+    delay_us(2); //original 2
     // verify on the scope
     HAL_GPIO_WritePin(ISO_SPI_NSS_GPIO_Port, ISO_SPI_NSS_Pin, GPIO_PIN_SET);
 }
@@ -30,8 +30,7 @@ void wakeup_idle(){
 void wakeup_sleep()
 {
     HAL_GPIO_WritePin(ISO_SPI_NSS_GPIO_Port, ISO_SPI_NSS_Pin, GPIO_PIN_RESET);
-    vTaskDelay(pdMS_TO_TICKS(1)); // verify is 1 ms on the scope. Also check tolerance on datasheet. 
-    // if needed, use hardware timer
+    delay_us(T_WAKE_US * NUM_BOARDS);
     HAL_GPIO_WritePin(ISO_SPI_NSS_GPIO_Port, ISO_SPI_NSS_Pin, GPIO_PIN_SET);
 }
 

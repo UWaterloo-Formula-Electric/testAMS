@@ -184,7 +184,7 @@ void Error_Handler(void)
   __disable_irq();
   while (1)
   {
-    DEBUG_PRINT("ERROR OCCURRED. NOW IN ERROR HANDLER\n");
+    printf("ERROR OCCURRED. NOW IN ERROR HANDLER\n");
     HAL_Delay(3000);
   }
   /* USER CODE END Error_Handler_Debug */

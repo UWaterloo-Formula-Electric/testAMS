@@ -153,8 +153,8 @@ void MX_FREERTOS_Init(void) {
   mainTaskHandle = osThreadCreate(osThread(mainTask), NULL);
 
   /* definition and creation of printTaskName */
-  osThreadDef(printTaskName, printTask, osPriorityLow, 0, 1000);
-  printTaskNameHandle = osThreadCreate(osThread(printTaskName), NULL);
+  // osThreadDef(printTaskName, printTask, osPriorityLow, 0, 1000);
+  // printTaskNameHandle = osThreadCreate(osThread(printTaskName), NULL);
 
   /* definition and creation of AMS */
   osThreadDef(AMS, amsTask, osPriorityRealtime, 0, 1000);

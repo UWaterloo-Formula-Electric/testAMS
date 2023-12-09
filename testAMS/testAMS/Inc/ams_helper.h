@@ -10,8 +10,14 @@
 #include "main.h"
 
 #define HSPI_TIMEOUT 15
+#define T_WAKE_US 100
+#define T_READY_US 10
 
-#define GPIO_TOGGLE_ERROR_LED HAL_GPIO_TogglePin(LED_R_GPIO_Port, LED_R_Pin);
+#define GPIO_TOGGLE_ERROR_LED HAL_GPIO_TogglePin(LED_R_GPIO_Port, LED_R_Pin)
+#define GPIO_TOGGLE_Y_LED HAL_GPIO_TogglePin(LED_Y_GPIO_Port, LED_Y_Pin)
+
+#define AMS_CONT_CLOSE    HAL_GPIO_WritePin(AMS_CONT_GPIO_Port,AMS_CONT_Pin,GPIO_PIN_SET)
+
 /*
   Pre computed crc15 table used for the LTC6804 PEC calculation
 

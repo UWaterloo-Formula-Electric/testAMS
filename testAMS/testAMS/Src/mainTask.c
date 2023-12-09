@@ -19,7 +19,7 @@
 
 void mainTaskFunction(void const * argument)
 {
-    DEBUG_PRINT("Starting up!!\n");
+    printf("Starting up!!\n");
     TickType_t xLastWakeTime = xTaskGetTickCount();
 
     while (1) {

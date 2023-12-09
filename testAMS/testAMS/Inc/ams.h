@@ -7,8 +7,10 @@
 #include "main.h"
 #include "ltcChipSettings.h"
 
+#define START_NUM_TRIES (3)
 #define AMS_TASK_PERIOD_MS 300 // should be 100 ms
-#define T_REFUP_MS           6 // Takes 5.5 ms for reference to power up
+#define T_IDLE_MS            5 // Time for SPI bus to go to idle state (5.5 ms)
+#define T_REFUP_MS           6 // Data sheet says 3.5 ms?? won't work if any lower than 6
 
 #define ADC_OPT(en) ((en) << 0) // Since we're using the normal 7kHz mode
 #define SWTRD(en) ((en) << 1) // We're not using the software time
@@ -19,6 +21,7 @@
 #define COMMAND_SIZE 2
 #define PEC_SIZE 2
 #define CELL_IN_REG 3
+#define JUNK_SIZE 1
 #define VOLTAGE_BLOCK_SIZE 6 // 6 bytes per group
 #define AUX_BLOCK_SIZE 6 // 6 bytes per group
 #define CELL_VOLTAGE_SIZE_BYTES 2 // 2 bytes form one cell voltage
@@ -99,6 +102,8 @@
 
 
 void initChipConfig(void);
+
+int batt_spi_wakeup(bool sleeping);
 
 HAL_StatusTypeDef batt_write_config(void);
 
