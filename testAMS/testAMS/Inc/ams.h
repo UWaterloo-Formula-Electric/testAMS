@@ -8,9 +8,9 @@
 #include "ltcChipSettings.h"
 
 #define START_NUM_TRIES (3)
-#define AMS_TASK_PERIOD_MS 300 // should be 100 ms
+#define AMS_TASK_PERIOD_MS 100 // should be 100 ms
 #define T_IDLE_MS            5 // Time for SPI bus to go to idle state (5.5 ms)
-#define T_REFUP_MS           6 // Data sheet says 3.5 ms?? won't work if any lower than 6
+#define T_REFUP_MS           7 // Data sheet says 3.5 ms?? won't work if any lower than 6
 
 #define ADC_OPT(en) ((en) << 0) // Since we're using the normal 7kHz mode
 #define SWTRD(en) ((en) << 1) // We're not using the software time

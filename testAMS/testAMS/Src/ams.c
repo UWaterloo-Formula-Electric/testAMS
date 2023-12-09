@@ -88,7 +88,7 @@ HAL_StatusTypeDef batt_verify_config(void)
     /* PROBLEM: same problem here. It is taking way longer than expected (40 seconds)*/
     for(int board = 0; board < NUM_BOARDS; board++) {
         for(int buff_byte = 0; buff_byte < BATT_CONFIG_SIZE; buff_byte++) {
-            printf("Read Config A, board %d, byte_val: %d, expected: %d\n", board, configBuffer[board][buff_byte], m_batt_config[board][buff_byte]);
+            // printf("Read Config A, board %d, byte_val: %d, expected: %d\n", board, configBuffer[board][buff_byte], m_batt_config[board][buff_byte]);
             if(m_batt_config[board][buff_byte] != configBuffer[board][buff_byte]) {
             //     DEBUG_PRINT("ERROR: m_batt_config board: %d, buff_byte %d, mismatch", board, buff_byte);
                 // DEBUG_PRINT("FAILD CONFIG MATCH\n");
@@ -394,6 +394,7 @@ HAL_StatusTypeDef readCellVoltages(uint8_t total_ic, // the number of ICs in the
             /* !! PROBLEM: the if statement below take 42 seconds to compute (or it may just be freezing FreeRTOS) before the error statement is printed*/
             if (received_pec != data_pec)
             {
+                printf("wrong PEC in readCellVoltages");
                 // DEBUG_PRINT("PEC Error in readCellVoltages\n");
                 return HAL_ERROR;
             }
@@ -432,8 +433,10 @@ void amsTask(void *pvParameter)
         }
 
         // vTaskDelay(pdMS_TO_TICKS(2)); // testing, 30 ms is good. 10 ms seems to be the lowest we can go
-        // ^ vTaskDelay might be causing issues due to inaccuracies 
+        // // ^ vTaskDelay might be causing issues due to inaccuracies 
         // delay_us(300); // specs say 2.3 MS
+
+        // vTaskDelay(pdMS_TO_TICKS(3));
 
         if (readCellVoltages(NUM_BOARDS, cell_voltages) != HAL_OK) {
             // DEBUG_PRINT("Failed to read cell voltages and temperatures!\n");
@@ -449,7 +452,9 @@ void amsTask(void *pvParameter)
 
 void printCellVoltages(uint8_t board)
 {
-    for (int i = 0; i < CELLS_PER_BOARD; i++) {
-        printf("Cell Voltage[%i]: %f\n", i, cell_voltages[board][i]);
-    }
+    // for (int i = 0; i < CELLS_PER_BOARD; i++) {
+    //     printf("Cell Voltage[%i]: %f\n", i, cell_voltages[board][i]);
+    // }
+
+    printf("Cell Voltage[1]: %f\n", cell_voltages[board][1]);
 }
